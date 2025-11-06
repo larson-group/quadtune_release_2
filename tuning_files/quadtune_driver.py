@@ -21,6 +21,7 @@ import sys
 import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import Bounds
+from scipy.linalg import eigh
 from scipy.interpolate import UnivariateSpline
 from sklearn import linear_model
 
@@ -81,6 +82,7 @@ def main(args):
      transformedParamsNames,
      defaultNcFilename, globTunedNcFilename,
      interactParamsNamesAndFilenames,
+     doCalcGenEig,
      doPiecewise,
      reglrCoef, penaltyCoef, doBootstrapSampling,
      paramsNamesScalesAndFilenames, folder_name,
@@ -121,8 +123,13 @@ def main(args):
         paramsAbbrv = process_config_info.abbreviate_params_names(paramsNames, abbreviateParamsNames)
 
     if doBootstrapSampling:
-        numBootstrapSamples, folder_name_SST4K, defaultSST4KNcFilename =\
+        numBootstrapSamples =\
               config_file.config_bootstrap(beVerbose)
+        
+    if doCalcGenEig or doBootstrapSampling:
+        folder_name_SST4K, defaultSST4KNcFilename = config_file.config_additional(beVerbose)
+
+        assert folder_name_SST4K != '', "folder_name_SST4K and defaultSST4KNcFilename must be provided if doCalcGenEig or doBootstrapSampling is True"
         _, _ , sensSST4KNcFilenames, sensSST4KNcFilenamesExt  =\
               process_config_info.process_paramsnames_scales_and_filesuffixes(paramsNamesScalesAndFilenames, folder_name_SST4K)
 
@@ -282,17 +289,9 @@ def main(args):
                                   normlzd_dpMid,
                                   normlzdLeftSensMatrix, normlzdRightSensMatrix,
                                   numMetrics)
+    
 
-    #######################################################################################################
-    #
-    # Calculate an ensemble of parameter values by doing bootstrap sampling of the regional metrics.
-    #
-    #######################################################################################################
-
-    if doBootstrapSampling:
-
-        print("Starting bootstrap sampling . . .")
-
+    if doCalcGenEig or doBootstrapSampling:
         # SST4K:  call constructNormlzdSensCurvMatrices with SST4K sensFiles.
 
         # For SST4K runs,
@@ -306,6 +305,18 @@ def main(args):
             constructNormlzdSensCurvMatrices(metricsNames, paramsNames, transformedParamsNames,
                                              normMetricValsCol, magParamValsRow,
                                              sensSST4KNcFilenames, sensSST4KNcFilenamesExt, defaultSST4KNcFilename)
+
+    #######################################################################################################
+    #
+    # Calculate an ensemble of parameter values by doing bootstrap sampling of the regional metrics.
+    #
+    #######################################################################################################
+
+    if doBootstrapSampling:
+
+        print("Starting bootstrap sampling . . .")
+
+        
 
         # SST4K: Here feed normlzdSensMatrixPoly and normlzdCurvMatrix from SST4K runs into bootstrapCalculations.
 
@@ -507,7 +518,57 @@ def main(args):
                                     normlzdCurvMatrix, numMetrics)
     #normlzdWeightedLinplusSensMatrixPoly = np.diag(np.transpose(metricsWeights)[0]) \
     #                                          @ normlzdLinplusSensMatrixPoly
+    if doCalcGenEig:
+        # normlzdLinplusSensMatrixPolySST4K = \
+        #     normlzdSemiLinMatrixFnc(dnormlzdParamsSolnNonlin, normlzdSensMatrixPolySST4K, normlzdCurvMatrixSST4K, numMetrics)
+        
+        # normlzdLinplusSensMatrixPolySST4K = normlzdSensMatrixPolySST4K
+        eigenvals, eigenvecs = eigh(a=normlzdSensMatrixPolySST4K.T @ normlzdSensMatrixPolySST4K,\
+                                     b=normlzdSensMatrixPoly.T @ normlzdSensMatrixPoly)
+        
+        ratios = []
+        print(f"ParamsNames: {' '.join(paramsNames)}")
+        for idx, eigenval in enumerate(eigenvals):
+            eigenvec =  eigenvecs[:,idx]
+
+            print(f"Eigenvalue {idx}: {eigenval}, Eigenvector: {eigenvec}")
+            
+            ratios.append((eigenvec.T @ normlzdSensMatrixPolySST4K.T @ normlzdSensMatrixPolySST4K @ eigenvec) \
+                            / (eigenvec.T @ normlzdSensMatrixPoly.T @ normlzdSensMatrixPoly @ eigenvec))
+        
+        print(f"Ratios:",ratios)
+        assert np.allclose(ratios, eigenvals), "Ratios do not match eigenvalues!"
+
+        dnormlzdParamsMaxSST4K = eigenvecs[:,-1] 
+        print(f"Maximizing parameter perturbations: {dnormlzdParamsMaxSST4K}")   
+
+
+        dnormlzdMetricsGenEig = fwdFnc(dnormlzdParamsMaxSST4K.reshape((-1,1)), normlzdSensMatrixPoly, normlzdCurvMatrix*0, \
+                           doPiecewise, normlzd_dpMid, normlzdLeftSensMatrix, normlzdRightSensMatrix,\
+                           numMetrics, normlzdInteractDerivs, interactIdxs)
+        
+        dnormlzdMetricsGenEigSST4K = fwdFnc(dnormlzdParamsMaxSST4K.reshape((-1,1)), normlzdSensMatrixPolySST4K, normlzdCurvMatrixSST4K*0, \
+                           doPiecewise, normlzd_dpMidSST4K, normlzdLeftSensMatrixSST4K, normlzdRightSensMatrixSST4K,\
+                           numMetrics, normlzdInteractDerivs, interactIdxs)
+        
+        assert np.allclose(dnormlzdMetricsGenEigSST4K,normlzdSensMatrixPolySST4K @ dnormlzdParamsMaxSST4K.reshape((-1,1)) ),\
+              "Sanity check for fwdFnc with maximizing parameters failed for SST4K data"
+        
+        assert np.allclose(dnormlzdMetricsGenEig,normlzdSensMatrixPoly @ dnormlzdParamsMaxSST4K.reshape((-1,1)) ),\
+              "Sanity check for fwdFnc with maximizing parameters failed for PD data"
+    else: 
+        dnormlzdMetricsGenEig = None
+        dnormlzdMetricsGenEigSST4K = None
+
+    
+
+
+    
     if doCreatePlots:
+        if  createPlotType["SST4KPanelGallery"] and not doCalcGenEig:
+            print("Warning: createPlotType['SST4KPanelGallery'] is True but doCalcGenEig is False. Setting createPlotType['SST4KPanelGallery'] to False.")
+            createPlotType["SST4KPanelGallery"] = False
+            
         createFigs(numMetricsNoCustom, metricsNames, metricsNamesNoprefix,
                 numMetricsToTune,
                 varPrefixes, mapVarIdx, boxSize,
@@ -530,6 +591,7 @@ def main(args):
                 paramsSolnNonlin,
                 paramsSolnElastic, dnormlzdParamsSolnElastic,
                 sensNcFilenames, sensNcFilenamesExt, defaultNcFilename,
+                dnormlzdMetricsGenEig, dnormlzdMetricsGenEigSST4K,
                 createPlotType,
                 normlzdSensMatrixPoly,
                 reglrCoef, penaltyCoef, numMetrics,

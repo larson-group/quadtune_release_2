@@ -46,6 +46,9 @@ def config_core():
     # Flag for whether or not to create plots after the tuning is done.
     doCreatePlots = True
 
+    # Flag to enable reading SST4K regional files
+    doCalcGenEig = False
+
     # Set debug level
     debug_level = 1
     # Set perturbation for the recovery test
@@ -591,6 +594,7 @@ def config_core():
      transformedParamsNames,
      defaultNcFilename, globTunedNcFilename,
      interactParamsNamesAndFilenames,
+     doCalcGenEig,
      doPiecewise,
      reglrCoef, penaltyCoef, doBootstrapSampling,
      paramsNamesScalesAndSuffixes, folder_name,
@@ -646,6 +650,7 @@ def config_plots(beVerbose: bool, varPrefixes:list[str], paramsNames:list[str]) 
         'PcSensMap': True,                         # Maps showing sensitivities to parameters and left singular vectors
         'vhMatrixFig': True,                       # Color-coded matrix of right singular vectors
         'lossFncVsParamFig': True,                   # 2D loss function plots
+        'SST4KPanelGallery': False                 # Maps showing metrics perturbation for parameters from Generalized Eigenvalue problem
     }
 
     if beVerbose:
@@ -667,7 +672,7 @@ def config_plots(beVerbose: bool, varPrefixes:list[str], paramsNames:list[str]) 
     return createPlotType, highlightedMetricsToPlot, mapVarIdx, abbreviateParamsNames
 
 
-def config_bootstrap(beVerbose: bool) -> tuple[int,str,str]:
+def config_bootstrap(beVerbose: bool) -> int:
     """
     Configure settings for bootstrap sampling.
     For example specify how many bootstrap samples to create.
@@ -676,20 +681,23 @@ def config_bootstrap(beVerbose: bool) -> tuple[int,str,str]:
     """
     numBootstrapSamples: int = 100
 
-    # Directory where the SST4K regional files are stored (plus possibly a filename prefix)
-    #folder_name_SST4K = 'Regional_files/20241022_1yr_sst4k_20x20/20p4k1022_'
-    folder_name_SST4K = 'Regional_files/20250725_2yr_20x20_ANN_BCASE/20.0beta06_'
 
+    return numBootstrapSamples
+
+def config_additional(beVerbose:bool) -> tuple[str, str]:
+    """
+    Configure additional settings.
+    For example, specify SST4K filenames.
+    """
+
+    # Directory where the SST4K regional files are stored (plus possibly a filename prefix)
+    folder_name_SST4K = 'Regional_files/20250725_2yr_20x20_ANN_BCASE/20.0beta06_'
     defaultSST4KNcFilename = \
     (
-        #folder_name_SST4K + '1_Regional.nc'
         folder_name_SST4K + 'dflt_Regional.nc'
     )
 
-    return numBootstrapSamples, folder_name_SST4K, defaultSST4KNcFilename
-
-def config_additional(beVerbose:bool):
-    return
+    return folder_name_SST4K, defaultSST4KNcFilename
 
 
 

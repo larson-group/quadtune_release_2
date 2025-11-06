@@ -45,6 +45,9 @@ def config_core():
 
     # doPiecewise = True if using a piecewise linear emulator
     doPiecewise = False
+
+    # Flag to enable reading SST4K regional files
+    doCalcGenEig = False
     
 
     # Make varPrefixes a global variable so that it can be used in config_plots
@@ -203,6 +206,7 @@ def config_core():
      transformedParamsNames,
      defaultNcFilename, globTunedNcFilename,
      interactParamsNamesAndFilenames,
+     doCalcGenEig,
      doPiecewise,
      reglrCoef, penaltyCoef, doBootstrapSampling,
      paramsNamesScalesAndSuffixes, folder_name,
@@ -302,8 +306,21 @@ def config_bootstrap(beVerbose: bool) -> tuple[int,str,str]:
     return numBootstrapSamples, folder_name_SST4K, defaultSST4KNcFilename
 
 
-def config_additional(beVerbose:bool):
-    return
+def config_additional(beVerbose:bool) -> tuple[str, str]:
+    """
+    Configure additional settings.
+    For example, specify SST4K filenames.
+    """
+
+    # Directory where the SST4K regional files are stored (plus possibly a filename prefix)
+    folder_name_SST4K = ""
+
+    defaultSST4KNcFilename = \
+    (
+        folder_name_SST4K + ""
+    )
+
+    return folder_name_SST4K, defaultSST4KNcFilename
 
 
 

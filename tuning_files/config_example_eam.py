@@ -48,6 +48,11 @@ def config_core():
     #    in create_nonbootstrap_figs.py
     doCreatePlots = True
 
+    # Flag to enable reading SST4K regional files
+    doCalcGenEig = True
+
+    
+
     # Set debug level
     debug_level = 1
     # Set perturbation for the recovery test
@@ -97,8 +102,9 @@ def config_core():
     #folder_name = 'Regional_files/20240409updated/thresp26_'
     #folder_name = 'Regional_files/stephens_20240131/btune_regional_files/btune_'
 
-    # Directory where the SST4K regional files are stored (plus possibly a filename prefix)
-    ###folder_name_SST4K = folder_name
+
+
+
 
     # Netcdf file containing metric and parameter values from the default simulation
     #defaultNcFilename = \
@@ -596,6 +602,7 @@ def config_core():
      transformedParamsNames,
      defaultNcFilename, globTunedNcFilename,
      interactParamsNamesAndFilenames,
+     doCalcGenEig,
      doPiecewise,
      reglrCoef, penaltyCoef, doBootstrapSampling,
      paramsNamesScalesAndSuffixes, folder_name,
@@ -650,6 +657,7 @@ def config_plots(beVerbose: bool, varPrefixes:list[str], paramsNames:list[str]) 
         'PcSensMap': True,                         # Maps showing sensitivities to parameters and left singular vectors
         'vhMatrixFig': True,                       # Color-coded matrix of right singular vectors
         'lossFncVsParamFig': True,                 # 2D loss function plots
+        'SST4KPanelGallery': True                  # Maps showing metrics perturbation for parameters from Generalized Eigenvalue problem
     }
 
     if beVerbose:
@@ -673,7 +681,7 @@ def config_plots(beVerbose: bool, varPrefixes:list[str], paramsNames:list[str]) 
     return createPlotType, highlightedMetricsToPlot, mapVarIdx, abbreviateParamsNames
 
 
-def config_bootstrap(beVerbose: bool) -> tuple[int,str,str]:
+def config_bootstrap(beVerbose: bool) -> int:
     """
     Configure settings for bootstrap sampling.
     For example specify how many bootstrap samples to create.
@@ -681,6 +689,15 @@ def config_bootstrap(beVerbose: bool) -> tuple[int,str,str]:
     :param beVerbose: Boolean flag to make output more verbose.
     """
     numBootstrapSamples: int = 100
+
+    
+    return numBootstrapSamples
+
+def config_additional(beVerbose:bool) -> tuple[str, str]:
+    """
+    Configure additional settings.
+    For example, specify SST4K filenames.
+    """
 
     # Directory where the SST4K regional files are stored (plus possibly a filename prefix)
     folder_name_SST4K = 'Regional_files/20241022_1yr_sst4k_20x20/20p4k1022_'
@@ -690,10 +707,7 @@ def config_bootstrap(beVerbose: bool) -> tuple[int,str,str]:
         folder_name_SST4K + '1_Regional.nc'
     )
 
-    return numBootstrapSamples, folder_name_SST4K, defaultSST4KNcFilename
-
-def config_additional(beVerbose:bool):
-    return
+    return folder_name_SST4K, defaultSST4KNcFilename
 
 
 

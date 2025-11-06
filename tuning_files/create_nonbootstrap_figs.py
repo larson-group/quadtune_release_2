@@ -59,6 +59,7 @@ def createFigs(numMetricsNoSpecial, metricsNames, metricsNamesNoprefix,
                paramsSolnNonlin,
                paramsSolnElastic, dnormlzdParamsSolnElastic,
                sensNcFilenames, sensNcFilenamesExt, defaultNcFilename,
+               dNormlzdMetricsGenEig, dNormlzdMetricsGenEigSST4K,
                createPlotType,
                normlzdSensMatrix,
                reglrCoef, penaltyCoef, numMetrics,
@@ -944,6 +945,23 @@ def createFigs(numMetricsNoSpecial, metricsNames, metricsNamesNoprefix,
         #PcMapFig.add_trace(PcMapPanelU0.data[0], row=1, col=1)
         #PcMapFig.add_trace(PcMapPanelU1.data[0], row=1, col=2)
 
+    if createPlotType['SST4KPanelGallery']:
+
+        print("Creating SST4KPanelGallery . . .")
+
+        minField = np.minimum.reduce([ np.min(dNormlzdMetricsGenEigSST4K),
+                                       np.min(dNormlzdMetricsGenEig)])
+        maxField = np.maximum.reduce([ np.max(dNormlzdMetricsGenEigSST4K),
+                                       np.max(dNormlzdMetricsGenEig)])
+        
+        SST4KGenEigPanel = createMapPanel(dNormlzdMetricsGenEigSST4K, 500, 'SST4K Metrics Perturbation for maximizing Parameters', boxSize,
+                                           minField=minField, maxField=maxField)
+        GenEigPanel = createMapPanel(dNormlzdMetricsGenEig, 500, 'Metrics Perturbation for maximizing Parameters', boxSize,
+                                            minField=minField, maxField=maxField)
+
+
+
+
     if createPlotType['vhMatrixFig']:
 
         print("Creating SVD vh matrix figure . . .")
@@ -1015,6 +1033,15 @@ def createFigs(numMetricsNoSpecial, metricsNames, metricsNamesNoprefix,
 
         html.Div(children=''' ''')]
 
+
+    if createPlotType["SST4KPanelGallery"]: 
+
+        dashboardChildren.append(html.H2(children="Generalized Eigenvalue metrics perturbation", style={'text-indent': '450px'}))
+        dashboardChildren.append(dcc.Graph(id="SST4KMaxMetricsFig", figure=SST4KGenEigPanel,
+                    style={'display': 'inline-block'}, config=downloadConfig))
+        dashboardChildren.append(dcc.Graph(id="MaxMetricsFig", figure=GenEigPanel,
+                    style={'display': 'inline-block'}, config=downloadConfig))
+        
     if createPlotType['PcSensMap']:
         dashboardChildren.append(html.H2(children=mapVarName, style={'text-indent': '450px'}))
         dashboardChildren.extend(BiasParamsDashboardChildren)
