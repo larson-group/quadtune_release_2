@@ -59,9 +59,8 @@ def createFigs(numMetricsNoSpecial, metricsNames, metricsNamesNoprefix,
                paramsSolnNonlin,
                paramsSolnElastic, dnormlzdParamsSolnElastic,
                sensNcFilenames, sensNcFilenamesExt, defaultNcFilename,
-               dNormlzdMetricsGenEig, dNormlzdMetricsGenEigSST4K,
+               dNormlzdMetricsGenEig, dNormlzdMetricsGenEigSST4K, normlzdSensMatrixPolySST4K,
                createPlotType,
-               normlzdSensMatrix,
                reglrCoef, penaltyCoef, numMetrics,
                beVerbose,
                useLongTitle, paramBoundsBoot):
@@ -953,12 +952,35 @@ def createFigs(numMetricsNoSpecial, metricsNames, metricsNamesNoprefix,
                                        np.min(dNormlzdMetricsGenEig)])
         maxField = np.maximum.reduce([ np.max(dNormlzdMetricsGenEigSST4K),
                                        np.max(dNormlzdMetricsGenEig)])
+
         
-        SST4KGenEigPanel = createMapPanel(dNormlzdMetricsGenEigSST4K, 500, 'SST4K Metrics Perturbation for maximizing Parameters', boxSize,
+        SST4KGenEigPanel = createMapPanel(dNormlzdMetricsGenEigSST4K, 600, 'SST4K Metrics Perturbation for maximizing Parameters', boxSize,
                                            minField=minField, maxField=maxField)
-        GenEigPanel = createMapPanel(dNormlzdMetricsGenEig, 500, 'Metrics Perturbation for maximizing Parameters', boxSize,
+        GenEigPanel = createMapPanel(dNormlzdMetricsGenEig, 600, 'Metrics Perturbation for maximizing Parameters', boxSize,
                                             minField=minField, maxField=maxField)
 
+        SensMatrixPanels = np.empty((2, len(paramsNames)), dtype=object)
+        for paramIdx, paramName in enumerate(paramsNames):
+
+            minField = np.minimum.reduce([ np.min(normlzdSensMatrixPoly[:, paramIdx]),
+                                       np.min(normlzdSensMatrixPolySST4K[:, paramIdx])])
+            maxField = np.maximum.reduce([ np.max(normlzdSensMatrixPoly[:, paramIdx]),
+                                       np.max(normlzdSensMatrixPolySST4K[:, paramIdx])])
+            SensMatrixPanels[0, paramIdx] = createMapPanel(
+                    normlzdSensMatrixPoly[:, paramIdx],
+                    600,
+                    f'Sensitivity Map for {paramName}',
+                    boxSize,
+                    minField=minField,
+                    maxField=maxField)
+                
+            SensMatrixPanels[1,paramIdx] = createMapPanel(
+                    normlzdSensMatrixPolySST4K[:, paramIdx],
+                    600,
+                    f'SST4K Sensitivity Map for {paramName}',
+                    boxSize,
+                    minField=minField,
+                    maxField=maxField)
 
 
 
@@ -1012,7 +1034,7 @@ def createFigs(numMetricsNoSpecial, metricsNames, metricsNamesNoprefix,
         # perturbFactors contains a list of factors by which the tuned parameter perturbations are perturbed, before evaluating the loss function
         perturbFactors = np.linspace(-1,2,101)
         lossFncVsParamPanelList = createLossFncVsParamPanels(perturbFactors, dnormlzdParamsSolnNonlin,
-                                normlzdSensMatrix, normlzdDefaultBiasesCol,
+                                normlzdSensMatrixPoly, normlzdDefaultBiasesCol,
                                 metricsWeights, normlzdCurvMatrix,
                                 doPiecewise, normlzd_dpMid,
                                 normlzdLeftSensMatrix, normlzdRightSensMatrix,
@@ -1034,13 +1056,20 @@ def createFigs(numMetricsNoSpecial, metricsNames, metricsNamesNoprefix,
         html.Div(children=''' ''')]
 
 
+
     if createPlotType["SST4KPanelGallery"]: 
 
         dashboardChildren.append(html.H2(children="Generalized Eigenvalue metrics perturbation", style={'text-indent': '450px'}))
-        dashboardChildren.append(dcc.Graph(id="SST4KMaxMetricsFig", figure=SST4KGenEigPanel,
-                    style={'display': 'inline-block'}, config=downloadConfig))
-        dashboardChildren.append(dcc.Graph(id="MaxMetricsFig", figure=GenEigPanel,
-                    style={'display': 'inline-block'}, config=downloadConfig))
+
+        GenEigDccGraph = dcc.Graph(id="MaxMetricsFig", figure=GenEigPanel, config=downloadConfig)
+        GenEigSST4KDccGraph = dcc.Graph(id="SST4KMaxMetricsFig", figure=SST4KGenEigPanel, config=downloadConfig)
+        
+        left_col = html.Div([GenEigDccGraph] + [dcc.Graph(id=f"GenEigSensMatrixFig_{i}", figure=fig, config=downloadConfig)
+                              for i, fig in enumerate(SensMatrixPanels[0])],style={'width': '40%' })
+        right_col = html.Div([GenEigSST4KDccGraph] + [dcc.Graph(id=f"GenEigSensMatrixFigSST4K_{i}", figure=fig, config=downloadConfig)
+                              for i, fig in enumerate(SensMatrixPanels[1])],style={'width': '40%' })
+        
+        dashboardChildren.append(html.Div([left_col, right_col], style={'display': 'flex'}))
         
     if createPlotType['PcSensMap']:
         dashboardChildren.append(html.H2(children=mapVarName, style={'text-indent': '450px'}))
@@ -1554,36 +1583,33 @@ def createMapPanel(fieldToPlotCol,
     #                  (maxField - minField)
 
     # Draw a colored rectangle in each region in layer underneath
-    #print("After setting colorScale, it = ", colorScale)
-    #colorIdx = 0
-    colorList = []
-    for latIdx, lat in np.ndenumerate(latRange):
-        for lonIdx, lon in np.ndenumerate(lonRange):
-            # 'bluered'
-            colorString = pc.sample_colorscale(colorscale=colorScale,
-                                         samplepoints=normlzdColorMatrix[latIdx, lonIdx],
-                                         )[0]
-                                         #low = 0, high = 1)[0]
 
-            colorList.append([normlzdColorMatrix[latIdx, lonIdx].item(),
-                              colorString])
+    # This new version is faster, since it uses fewer index lookups and generates all shapes first and then updates the layout only once.
+    # The old version called update_layout repeatedly within the loop.
+    normlzdColorMatrixflat = normlzdColorMatrix.ravel()
+    sampled_colors = pc.sample_colorscale(colorscale=colorScale, samplepoints=normlzdColorMatrixflat)
 
-            regionalMapPanel.add_shape(
-                type="rect",
+    # Define positions of north,east,south,west edges of each box
+    # Each array has numYBoxes*numXBoxes elements
+    lonsWestEdges = np.tile(lonRange,numYBoxes)
+    lonsEastEdges = lonsWestEdges + boxSize
+    latsNorthEdges = np.repeat(latRange, numXBoxes)
+    latsSouthEdges = latsNorthEdges - boxSize
+    shapes = [dict(
+        type="rect",
                 xref="x",
                 yref="y",
-                x0=lon,
-                y0=lat,
-                x1=lon + boxSize,
-                y1=lat - boxSize,
+                x0=lonsWestEdge,
+                y0=latsNorthEdge,
+                x1=lonsEastEdge,
+                y1=latsSouthEdge,
                 line=dict(color="black", width=1),
-                #fillcolor=colorList[colorIdx],
-                fillcolor=colorString,
+                fillcolor=color,
                 opacity=1.0,
                 layer="below"
-            )
+    ) for lonsWestEdge, latsNorthEdge, lonsEastEdge, latsSouthEdge, color in zip(lonsWestEdges, latsNorthEdges, lonsEastEdges, latsSouthEdges, sampled_colors)]
 
-            #colorIdx += 1
+    regionalMapPanel.update_layout(shapes=shapes)
 
     # Draw map of land boundaries in layer on top
     regionalMapPanel.update_geos(showcoastlines=True,

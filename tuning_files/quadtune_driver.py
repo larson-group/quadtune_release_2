@@ -541,6 +541,9 @@ def main(args):
 
         dnormlzdParamsMaxSST4K = eigenvecs[:,-1] 
         print(f"Maximizing parameter perturbations: {dnormlzdParamsMaxSST4K}")   
+        print(f"Maximizing parameter values: {(dnormlzdParamsMaxSST4K.reshape((-1,1))
+                                                * np.transpose(magParamValsRow) + np.transpose(defaultParamValsOrigRow)).flatten()}")
+
 
 
         dnormlzdMetricsGenEig = fwdFnc(dnormlzdParamsMaxSST4K.reshape((-1,1)), normlzdSensMatrixPoly, normlzdCurvMatrix*0, \
@@ -559,6 +562,7 @@ def main(args):
     else: 
         dnormlzdMetricsGenEig = None
         dnormlzdMetricsGenEigSST4K = None
+        normlzdSensMatrixPolySST4K = None
 
     
 
@@ -591,9 +595,8 @@ def main(args):
                 paramsSolnNonlin,
                 paramsSolnElastic, dnormlzdParamsSolnElastic,
                 sensNcFilenames, sensNcFilenamesExt, defaultNcFilename,
-                dnormlzdMetricsGenEig, dnormlzdMetricsGenEigSST4K,
+                dnormlzdMetricsGenEig, dnormlzdMetricsGenEigSST4K, normlzdSensMatrixPolySST4K,
                 createPlotType,
-                normlzdSensMatrixPoly,
                 reglrCoef, penaltyCoef, numMetrics,
                 beVerbose,
                 useLongTitle=False, paramBoundsBoot=paramBoundsBoot)
