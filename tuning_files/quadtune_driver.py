@@ -406,10 +406,20 @@ def main(args):
     #print("Tuned parameter perturbation values (dnormzldParamsSolnNonlin)")
     #for idx in range(0,len(paramsNames)): \
     #    print("{:33s} {:7.7g}".format(paramsNames[idx], dnormlzdParamsSolnNonlin[idx][0] ) )
-    print("\nTuned parameter values (paramsSolnNonlin)")
-    for idx in range(0,len(paramsNames)): \
-        print("{:33s} {:7.7g}".format(paramsNames[idx], paramsSolnNonlin[idx][0] ) )
 
+    widths = [
+        max(len(paramname) for paramname in paramsNames),
+        max(len(str(defaultParamVal)) for defaultParamVal in defaultParamValsOrigRow.flatten()),
+        max(len(str(paramSolnNonlin)) for paramSolnNonlin in paramsSolnNonlin.flatten() )
+    ]
+
+    print(f"{f'Parameter name':<{widths[0]}} {f'Default value':<{widths[1]}} {f'Tuned value':<{widths[2]}}")
+
+    for idx in range(0,len(paramsNames)): 
+        # print("{:33s} {:7.7g}".format(paramsNames[idx], paramsSolnNonlin[idx][0] ) )
+        print(f"{paramsNames[idx]:<{widths[0]}} {defaultParamValsOrigRow[0][idx]:<{widths[1]}.7g} {paramsSolnNonlin[idx][0]:<{widths[2]}.7g}")
+
+    print("")
     # Check whether the minimizer actually reduces chisqd
     # Initial value of chisqd, which assumes parameter perturbations are zero
     #normlzdWeightedDefaultBiasesCol = metricsWeights * normlzdDefaultBiasesCol
@@ -952,14 +962,7 @@ def lossFncWithPenalty(dnormlzdParams, normlzdSensMatrix, normlzdDefaultBiasesCo
     chisqd = np.sum(np.square(weightedBiasDiffCol)) \
              + reglrCoef * np.linalg.norm(dnormlzdParams, ord=1) \
              + penaltyCoef * \
-                 np.square( np.sum (
-                     lossFncMetricsKernel(dnormlzdParams, normlzdSensMatrix,
-                                          normlzdDefaultBiasesCol, metricsWeights,
-                                          normlzdCurvMatrix,
-                                          doPiecewise, normlzd_dpMid,
-                                          normlzdLeftSensMatrix, normlzdRightSensMatrix,
-                                          numMetrics,
-                                          normlzdInteractDerivs, interactIdxs)
+                 np.square( np.sum (weightedBiasDiffCol
 #                     (-normlzdDefaultBiasesCol
 #                    - fwdFnc(dnormlzdParams, normlzdSensMatrix, normlzdCurvMatrix,
 #                             doPiecewise, normlzd_dpMid,
